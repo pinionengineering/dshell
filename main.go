@@ -10,9 +10,20 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/query"
+
+	// supported datastores
 	badger "github.com/ipfs/go-ds-badger"
 	flatfs "github.com/ipfs/go-ds-flatfs"
 	leveldb "github.com/ipfs/go-ds-leveldb"
+	dsblob "github.com/pinionengineering/go-ds-blob"
+
+	// go-ds-blob backends
+	// https://gocloud.dev/howto/blob/
+	_ "gocloud.dev/blob/azureblob"
+	_ "gocloud.dev/blob/fileblob"
+	_ "gocloud.dev/blob/gcsblob"
+	_ "gocloud.dev/blob/memblob"
+	_ "gocloud.dev/blob/s3blob"
 )
 
 var (
@@ -32,7 +43,7 @@ func main() {
 	app := grumble.New(&grumble.Config{
 		Name:        "dshell",
 		Description: "A shell for interacting with datastores.",
-		Prompt:      "dshell-> ",
+		Prompt:      "dshell()-> ",
 	})
 
 	app.AddCommand(&grumble.Command{
@@ -135,6 +146,8 @@ func main() {
 			f.StringL("fvg", "", "filter by value greater than")
 			f.StringL("fvge", "", "filter by value greater than or equal")
 			f.StringL("fve", "", "filter by value equal to")
+			f.StringL("ok", "", "order by key")
+			f.StringL("ov", "", "order by value")
 		},
 		Args: func(a *grumble.Args) {
 			a.String("prefix", "the prefix to query", grumble.Default("/"))
@@ -159,21 +172,24 @@ func requireDS(f func(*grumble.Context) error) func(*grumble.Context) error {
 
 func openCommand(c *grumble.Context) error {
 	kind := c.Args.String("kind")
-	path, err := expandHome(c.Args.String("path"))
+	path := c.Args.String("path")
+	fpath, err := expandHome(path)
 	if err != nil {
 		return err
 	}
-	path, err = filepath.Abs(path)
+	fpath, err = filepath.Abs(fpath)
 	if err != nil {
 		return err
 	}
 	switch kind {
 	case "badger":
-		DS, err = badger.NewDatastore(path, nil)
+		DS, err = badger.NewDatastore(fpath, nil)
 	case "leveldb":
-		DS, err = leveldb.NewDatastore(path, nil)
+		DS, err = leveldb.NewDatastore(fpath, nil)
 	case "flatfs":
-		DS, err = flatfs.Open(path, false)
+		DS, err = flatfs.Open(fpath, false)
+	case "blob":
+		DS, err = dsblob.New(context.Background(), path)
 	default:
 		err = fmt.Errorf("unknown datastore kind: %s", kind)
 	}
@@ -187,6 +203,7 @@ func kindsCommand(c *grumble.Context) error {
 	_, _ = c.App.Println("badger")
 	_, _ = c.App.Println("leveldb")
 	_, _ = c.App.Println("flatfs")
+	_, _ = c.App.Println("blob")
 	return nil
 }
 
@@ -224,10 +241,7 @@ func getCommand(c *grumble.Context) error {
 			return err
 		}
 	} else {
-		_, err := c.App.Println(string(val))
-		if err != nil {
-			return err
-		}
+		_, _ = c.App.Println(string(val))
 	}
 	return nil
 }
@@ -341,15 +355,30 @@ func queryCommand(c *grumble.Context) error {
 		})
 	}
 
-	orders := []query.Order{query.OrderByKey{}}
+	orders := make([]query.Order, 0)
+	if f := c.Flags.String("ok"); f != "" {
+		orders = append(orders, query.OrderByKey{})
+	}
+	if f := c.Flags.String("ov"); f != "" {
+		orders = append(orders, query.OrderByValue{})
+	}
 
 	qry := query.Query{
 		Prefix:   prefix,
-		Filters:  filters,
-		Orders:   orders,
 		Limit:    limit,
 		Offset:   offset,
 		KeysOnly: keysOnly,
+	}
+
+	_, _ = c.App.Println("Query: ", qry)
+
+	// datastores that do not support filters or orders will return an error
+	// even for an empty slice, so the slice must be nil if empty.
+	if len(filters) > 0 {
+		qry.Filters = filters
+	}
+	if len(orders) > 0 {
+		qry.Orders = orders
 	}
 
 	res, err := DS.Query(context.Background(), qry)
@@ -391,10 +420,7 @@ func queryCommand(c *grumble.Context) error {
 			if err != nil {
 				return err
 			}
-			_, err = c.App.Println("wrote ", n, " bytes to ", f.Name())
-			if err != nil {
-				return err
-			}
+			_, _ = c.App.Println("wrote ", n, " bytes to ", f.Name())
 			continue
 		}
 
@@ -409,10 +435,7 @@ func queryCommand(c *grumble.Context) error {
 					return err
 				}
 			} else {
-				_, err := c.App.Println(string(e.Value))
-				if err != nil {
-					return err
-				}
+				_, _ = c.App.Println(string(e.Value))
 			}
 		}
 	}
