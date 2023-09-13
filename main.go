@@ -370,7 +370,7 @@ func queryCommand(c *grumble.Context) error {
 		KeysOnly: keysOnly,
 	}
 
-	_, _ = c.App.Println("Query: ", qry)
+	_, _ = c.App.Println("QUERY: ", qry)
 
 	// datastores that do not support filters or orders will return an error
 	// even for an empty slice, so the slice must be nil if empty.
