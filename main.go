@@ -200,10 +200,10 @@ func openCommand(c *grumble.Context) error {
 }
 
 func kindsCommand(c *grumble.Context) error {
-	_, _ = c.App.Println("badger")
-	_, _ = c.App.Println("leveldb")
-	_, _ = c.App.Println("flatfs")
-	_, _ = c.App.Println("blob")
+	c.App.Println("badger")
+	c.App.Println("blob")
+	c.App.Println("flatfs")
+	c.App.Println("leveldb")
 	return nil
 }
 
@@ -232,8 +232,8 @@ func getCommand(c *grumble.Context) error {
 		if err != nil {
 			return err
 		}
-		_, err = c.App.Println("wrote ", n, " bytes to ", save)
-		return err
+		c.App.Println("wrote ", n, " bytes to ", save)
+		return nil
 	}
 	if c.Flags.Bool("binary") {
 		_, err := c.App.Write(val)
@@ -241,7 +241,7 @@ func getCommand(c *grumble.Context) error {
 			return err
 		}
 	} else {
-		_, _ = c.App.Println(string(val))
+		c.App.Println(string(val))
 	}
 	return nil
 }
@@ -263,8 +263,8 @@ func hasCommand(c *grumble.Context) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.App.Println(has)
-	return err
+	c.App.Println(has)
+	return nil
 }
 
 func syncCommand(c *grumble.Context) error {
@@ -278,8 +278,8 @@ func sizeCommand(c *grumble.Context) error {
 	if err != nil {
 		return err
 	}
-	_, err = c.App.Println(size)
-	return err
+	c.App.Println(size)
+	return nil
 }
 
 func queryCommand(c *grumble.Context) error {
@@ -370,7 +370,7 @@ func queryCommand(c *grumble.Context) error {
 		KeysOnly: keysOnly,
 	}
 
-	_, _ = c.App.Println("QUERY: ", qry)
+	c.App.Println("QUERY: ", qry)
 
 	// datastores that do not support filters or orders will return an error
 	// even for an empty slice, so the slice must be nil if empty.
@@ -395,10 +395,6 @@ func queryCommand(c *grumble.Context) error {
 		if err != nil {
 			return err
 		}
-		err := os.MkdirAll(save, 0755)
-		if err != nil {
-			return err
-		}
 	}
 	for e := range res.Next() {
 		if save != "" {
@@ -420,14 +416,11 @@ func queryCommand(c *grumble.Context) error {
 			if err != nil {
 				return err
 			}
-			_, _ = c.App.Println("wrote ", n, " bytes to ", f.Name())
+			c.App.Println("wrote ", n, " bytes to ", f.Name())
 			continue
 		}
 
-		_, err := c.App.Println("KEY: ", e.Key)
-		if err != nil {
-			return err
-		}
+		c.App.Println("KEY: ", e.Key)
 		if !keysOnly {
 			if c.Flags.Bool("binary") {
 				_, err := c.App.Write(e.Value)
@@ -435,7 +428,7 @@ func queryCommand(c *grumble.Context) error {
 					return err
 				}
 			} else {
-				_, _ = c.App.Println(string(e.Value))
+				c.App.Println(string(e.Value))
 			}
 		}
 	}
